@@ -1,0 +1,826 @@
+Program.Sub.ScreenSU.Start
+Gui.F_Dash..Create
+Gui.F_Dash..Caption("Raw Material Allocation Dashboard")
+Gui.F_Dash..Size(10935,6135)
+Gui.F_Dash..MinX(0)
+Gui.F_Dash..MinY(0)
+Gui.F_Dash..Position(0,0)
+Gui.F_Dash..BackColor(-2147483633)
+Gui.F_Dash..MousePointer(0)
+Gui.F_Dash..Event(UnLoad,F_Dash_UnLoad)
+Gui.F_Dash.chkSuppress.Create(CheckBox)
+Gui.F_Dash.chkSuppress.Size(4380,360)
+Gui.F_Dash.chkSuppress.Position(75,90)
+Gui.F_Dash.chkSuppress.Caption("Suppress Sequences that have issued their estimate")
+Gui.F_Dash.chkSuppress.Event(Click,chkSupp_Click)
+Gui.F_Dash.chkInvSupp.Create(CheckBox)
+Gui.F_Dash.chkInvSupp.Size(6270,360)
+Gui.F_Dash.chkInvSupp.Position(4620,90)
+Gui.F_Dash.chkInvSupp.Caption("Suppress Parts that have less Quantity on Hand than the Sequences' estimate")
+Gui.F_Dash.chkInvSupp.Event(Click,chkSupp_Click)
+Gui.F_Dash.gsgcRawMat.Create(GsGridControl)
+Gui.F_Dash.gsgcRawMat.Size(10815,2370)
+Gui.F_Dash.gsgcRawMat.Position(0,525)
+Gui.F_Dash.gsgcRawMat.Anchor(15)
+Gui.F_Dash.gsgcRawMat.Event(RowCellClick,gsgcRawMat_RowCellClick)
+Gui.F_Dash.gsgcRawMat.Event(CellValueChanged,gsgcRawMat_CellValueChanged)
+Gui.F_Dash.gsgcLotBin.Create(GsGridControl)
+Gui.F_Dash.gsgcLotBin.Size(10815,2385)
+Gui.F_Dash.gsgcLotBin.Position(0,2880)
+Gui.F_Dash.gsgcLotBin.Anchor(14)
+Gui.F_Dash.gsgcLotBin.Event(CellValueChanged,gsgcLotBin_CellValueChanged)
+Gui.F_Dash.cmdProcess.Create(Button)
+Gui.F_Dash.cmdProcess.Size(1095,420)
+Gui.F_Dash.cmdProcess.Position(150,5355)
+Gui.F_Dash.cmdProcess.Caption("Process")
+Gui.F_Dash.cmdProcess.Event(Click,cmdProcess_Click)
+Gui.F_Dash.cmdProcess.Anchor(6)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+Program.External.Include.Library("GCG_5983_Try_Catch.lib")
+Program.External.Include.Library("450000.lib")
+Program.External.Include.Library("300011.lib")
+Program.External.Include.Library("450100.lib")
+V.Global.bUseRev.Declare
+V.Global.bAutoIssue.Declare
+V.Global.sUser1.Declare
+V.Global.sUser2.Declare
+V.Global.sUser3.Declare
+V.Global.sUser4.Declare
+V.Global.sUser5.Declare
+V.Global.sUser6.Declare
+V.Global.sUser7.Declare
+V.Global.sUser8.Declare
+V.Global.sUser9.Declare
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+'Author: BixRB
+'Date: 13 May 2020
+'GCG_5983_Raw_Material_Allocation_Dash.g2u
+'Acero Precision
+'Dashboard to display raw material allocation options and allow issue material
+F.Intrinsic.Control.Try
+
+F.Global.General.ReadOption("070008",0,False,"0000",V.Global.bUseRev)
+F.Global.General.ReadOption("400368",0,False,"0000",V.Global.bAutoIssue)
+F.Global.General.ReadOption("402256",1,"User 1","0000",V.Global.sUser1)
+F.Global.General.ReadOption("402257",1,"User 2","0000",V.Global.sUser2)
+F.Global.General.ReadOption("402258",1,"User 3","0000",V.Global.sUser3)
+F.Global.General.ReadOption("402259",1,"User 4","0000",V.Global.sUser4)
+F.Global.General.ReadOption("402260",1,"User 5","0000",V.Global.sUser5)
+F.Global.General.ReadOption("402261",1,"User 6","0000",V.Global.sUser6)
+F.Global.General.ReadOption("402262",1,"User 7","0000",V.Global.sUser7)
+F.Global.General.ReadOption("402263",1,"User 8","0000",V.Global.sUser8)
+F.Global.General.ReadOption("402264",1,"User 9","0000",V.Global.sUser9)
+
+F.Intrinsic.Control.CallSub(LoadOptions)
+
+F.Intrinsic.UI.InvokeWaitDialog("Loading Data...","Raw Material Allocation Dashboard")
+F.Intrinsic.Control.CallSub(LoadDT)
+F.Intrinsic.UI.ChangeWaitStatus("Setting up Dashboard...")
+F.Intrinsic.Control.CallSub(SetupGridView)
+F.Intrinsic.UI.CloseWaitDialog
+
+Gui.F_Dash..Show
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage,"ScriptFile",V.Caller.ScriptFile,"CurrentSubroutine",V.Ambient.CurrentSubroutine)
+	F.Intrinsic.Control.CallSub(F_Dash_UnLoad)
+F.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.F_Dash_UnLoad.Start
+F.Intrinsic.Control.Try
+
+'7/14/21 PG -- commented out due to invalid connection error occurring. 
+'F.Intrinsic.Control.If(V.ODBC.con.State,=,1)
+'	F.ODBC.Connection!con.Close
+'F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.If(V.DataTable.dtRawMaterial.Exists)
+	F.Intrinsic.Control.CallSub(Serialize)
+	F.Data.DataTable.Close("dtRawMaterial")
+	F.Data.DataTable.Close("dtLotBin")
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage,"ScriptFile",V.Caller.ScriptFile,"CurrentSubroutine",V.Ambient.CurrentSubroutine)
+	F.Intrinsic.Control.End
+F.Intrinsic.Control.EndTry
+Program.Sub.F_Dash_UnLoad.End
+
+Program.Sub.LoadDT.Start
+V.Local.sFilter.Declare
+V.Local.iCnt.Declare
+F.Intrinsic.Control.Try
+
+F.ODBC.Connection!con.OpenCompanyConnection
+F.Data.DataTable.CreateFromSQL("dtInvMstr","con","select PART, LOCATION, rtrim(PRODUCT_LINE) as PL, QTY_ONHAND, FLAG_LOT from V_INVENTORY_MSTR;",False)
+F.Data.DataTable.CreateFromSQL("dtInvMst2","con","select PART, LOCATION, rtrim(CODE_SOURCE) as CODE_SOURCE from V_INVENTORY_MST2;",False)
+F.Data.DataTable.CreateFromSQL("dtJobHeader","con","select JOB, SUFFIX, PART, LOCATION, DATE_CLOSED from V_JOB_HEADER where DATE_CLOSED = '1900-01-01';",False)
+F.Data.DataTable.CreateFromSQL("dtJobOperations","con","select JOB, SUFFIX, SEQ, LMO, PART, LOCN as LOCATION, rtrim(DESCRIPTION) as DESCRIPTION, FLAG_CLOSED, HOURS_ESTIMATED as QTY_EST, HOURS_ACTUAL as QTY_ACT, DATE_START, DATE_DUE from V_JOB_OPERATIONS where FLAG_CLOSED <> 'Y' and LMO = 'M' and SEQ < '995000';",False)
+F.Data.DataTable.CreateFromSQL("dtJobOperationsL","con","select JOB, SUFFIX, SEQ, LMO, rtrim(PART) as WC, rtrim(DESCRIPTION) as DESCRIPTION from V_JOB_OPERATIONS where LMO = 'L' and SEQ < '995000' and OPERATION = 'RUNTIM';",False)
+F.Data.DataTable.CreateFromSQL("dtProductLine","con","select rtrim(PRODUCT_LINE) as PL, rtrim(PRODUCT_LINE_NAME) as PL_NAME from V_PRODUCT_LINE;",False)
+F.Data.DataTable.CreateFromSQL("dtItemMaster","con","select PART, LOCATION, rtrim(LOT) as LOT, rtrim(BIN) as BIN, rtrim(HEAT) as HEAT, rtrim(SERIAL_NUMBER) as SERIAL, rtrim(USER_FIELD_1) as USER_1, rtrim(USER_FIELD_2) as USER_2, rtrim(USER_FIELD_3) as USER_3, rtrim(USER_FIELD_4) as USER_4, rtrim(USER_FIELD_5) as USER_5, rtrim(USER_FIELD_6) as USER_6, rtrim(USER_FIELD_7) as USER_7, rtrim(USER_FIELD_8) as USER_8, rtrim(USER_FIELD_9) as USER_9, QUANTITY as QTY_ONHAND from V_ITEM_MASTER where QUANTITY > 0;",False)
+F.ODBC.Connection!con.Close
+
+F.Data.Linq.Join("InnerJoin","DataTable","dtJobOperations*!*OPS","DataTable","dtJobHeader*!*HEAD","OPS.JOB = HEAD.JOB and OPS.SUFFIX = HEAD.SUFFIX","DataTable","dtInvMstr*!*MSTR","OPS.PART = MSTR.PART and OPS.LOCATION = MSTR.LOCATION","DataTable","dtInvMst2*!*MST2","OPS.PART = MST2.PART and OPS.LOCATION = MST2.LOCATION","DataTable","dtProductLine*!*VPL","MSTR.PL = VPL.PL","OPS.JOB*!*OPS.SUFFIX*!*OPS.SEQ*!*OPS.PART*!*OPS.LOCATION*!*MSTR.PL*!*VPL.PL_NAME*!*OPS.DATE_START*!*OPS.DATE_DUE*!*OPS.DESCRIPTION*!*MSTR.QTY_ONHAND*!*OPS.QTY_EST*!*OPS.QTY_ACT*!*HEAD.PART as FG_PART*!*HEAD.LOCATION as FG_LOCATION*!*MSTR.FLAG_LOT",,,"OPS.JOB asc, OPS.SUFFIX asc, OPS.SEQ asc","dtRawMaterial",True)
+F.Data.Linq.Join("InnerJoin","DataTable","dtRawMaterial*!*OPS","DataTable","dtItemMaster*!*ITEM","OPS.PART = ITEM.PART and OPS.LOCATION = ITEM.LOCATION","OPS.JOB*!*OPS.SUFFIX*!*OPS.SEQ*!*OPS.PART*!*OPS.LOCATION*!*ITEM.LOT*!*ITEM.BIN*!*ITEM.HEAT*!*ITEM.SERIAL*!*ITEM.USER_1*!*ITEM.USER_2*!*ITEM.USER_3*!*ITEM.USER_4*!*ITEM.USER_5*!*ITEM.USER_6*!*ITEM.USER_7*!*ITEM.USER_8*!*ITEM.USER_9*!*ITEM.QTY_ONHAND",,,"ITEM.LOT asc, ITEM.BIN asc, ITEM.HEAT asc, ITEM.SERIAL asc","dtLotBin",True)
+F.Data.DataView.Create("dtLotBin","dvPart")
+F.Data.DataView.SetFilter("dtLotBin","dvPart","[JOB] = '' and [SUFFIX] = '' and [SEQ] = ''")
+
+F.Data.DataTable.AddColumn("dtRawMaterial","QTY_TOISSUE","Float",0)
+F.Data.DataTable.AddColumn("dtRawMaterial","LOTBINSATISFIED","Boolean",False)
+F.Data.DataTable.AddColumn("dtLotBin","QTY_TOISSUE","Float",0)
+
+F.Data.DataTable.AddExpressionColumn("dtRawMaterial","WO","String","iif(trim([SUFFIX]) = '', trim([JOB]), trim([JOB]) + '-' + trim([SUFFIX]))")
+F.Intrinsic.Control.If(V.Global.bUseRev)
+	F.Data.DataTable.AddExpressionColumn("dtRawMaterial","PART_NUM","String","trim(substring([PART], 1, 17))")
+	F.Data.DataTable.AddExpressionColumn("dtRawMaterial","PART_REV","String","trim(substring([PART], 18, 3))")
+	F.Data.DataTable.AddExpressionColumn("dtRawMaterial","FG_PART_NUM","String","trim(substring([FG_PART], 1, 17))")
+	F.Data.DataTable.AddExpressionColumn("dtRawMaterial","FG_PART_REV","String","trim(substring([FG_PART], 18, 3))")
+F.Intrinsic.Control.Else
+	F.Data.DataTable.AddExpressionColumn("dtRawMaterial","PART_NUM","String","trim([PART])")
+	F.Data.DataTable.AddExpressionColumn("dtRawMaterial","PART_REV","String","''")
+	F.Data.DataTable.AddExpressionColumn("dtRawMaterial","FG_PART_NUM","String","trim([FG_PART])")
+	F.Data.DataTable.AddExpressionColumn("dtRawMaterial","FG_PART_REV","String","''")
+F.Intrinsic.Control.EndIf
+F.Data.DataTable.AddExpressionColumn("dtRawMaterial","QTY_OPEN","Float","iif([QTY_EST] - [QTY_ACT] < 0, 0, [QTY_EST] - [QTY_ACT])")
+F.Data.DataTable.AddExpressionColumn("dtRawMaterial","SUPPRESS","Boolean","iif([QTY_OPEN] = 0, True, False)")
+F.Data.DataTable.AddExpressionColumn("dtRawMaterial","INV_SUPPRESS","Boolean","iif([QTY_ONHAND] < [QTY_OPEN], True, False)")
+F.Data.DataTable.AddExpressionColumn("dtRawMaterial","ISSUE_SATISFIED","Boolean","iif([FLAG_LOT] = 'Y', iif([LOTBINSATISFIED] = True, True, False), True)")
+
+F.Data.DataView.Create("dtRawMaterial","dvGridView")
+'set all dates that are 1/1/1900 to null
+F.Data.DataView.SetFilter("dtRawMaterial","dvGridView","[DATE_START] = #1/1/1900#")
+F.Data.DataView.SetValue("dtRawMaterial","dvGridView",-1,"DATE_START",V.Ambient.DBNull)
+F.Data.DataView.SetFilter("dtRawMaterial","dvGridView","[DATE_DUE] = #1/1/1900#")
+F.Data.DataView.SetValue("dtRawMaterial","dvGridView",-1,"DATE_DUE",V.Ambient.DBNull)
+F.Intrinsic.Control.If(V.Screen.F_Dash!chkSuppress.CheckedAsBoolean)
+	V.Local.sFilter.Set("[SUPPRESS] = False")
+F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.If(V.Screen.F_Dash!chkSuppress.CheckedAsBoolean,=,True,and,V.Screen.F_Dash!chkInvSupp.CheckedAsBoolean,=,True)
+	F.Intrinsic.String.Build("{0} and ",V.Local.sFilter,V.Local.sFilter)
+F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.If(V.Screen.F_Dash!chkInvSupp.CheckedAsBoolean)
+	F.Intrinsic.String.Build("{0}[INV_SUPPRESS] = False",V.Local.sFilter,V.Local.sFilter)
+F.Intrinsic.Control.EndIf
+F.Data.DataView.SetFilter("dtRawMaterial","dvGridView",V.Local.sFilter)
+
+F.Data.DataTable.AddColumn("dtRawMaterial","WORKCENTER","String","")
+
+F.Data.DataView.Create("dtJobOperationsL","dvJob")
+F.Data.DataView.SetSort("dtJobOperationsL","dvJob","SEQ asc")
+F.Intrinsic.Control.For(V.Local.iCnt,0,V.DataTable.dtRawMaterial.RowCount--,1)
+	F.Intrinsic.String.Build("[JOB] = '{0}' and [SUFFIX] = '{1}' and SEQ > '{2}'",V.DataTable.dtRawMaterial(V.Local.iCnt).JOB!FieldVal,V.DataTable.dtRawMaterial(V.Local.iCnt).SUFFIX!FieldVal,V.DataTable.dtRawMaterial(V.Local.iCnt).SEQ!FieldVal,V.Local.sFilter)
+	F.Data.DataView.SetFilter("dtJobOperationsL","dvJob",V.Local.sFilter)
+	F.Intrinsic.Control.If(V.DataView.dtJobOperationsL!dvJob.RowCount,>,0)
+		F.Data.DataTable.SetValue("dtRawMaterial",V.Local.iCnt,"WORKCENTER",V.DataView.dtJobOperationsL!dvJob(0).WC!FieldVal)
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.Next(V.Local.iCnt)
+
+F.Data.DataTable.Close("dtInvMstr")
+F.Data.DataTable.Close("dtInvMst2")
+F.Data.DataTable.Close("dtJobHeader")
+F.Data.DataTable.Close("dtJobOperations")
+F.Data.DataTable.Close("dtJobOperationsL")
+F.Data.DataTable.Close("dtProductLine")
+F.Data.DataTable.Close("dtItemMaster")
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage,"ScriptFile",V.Caller.ScriptFile,"CurrentSubroutine",V.Ambient.CurrentSubroutine)
+	F.Intrinsic.Control.CallSub(F_Dash_UnLoad)
+F.Intrinsic.Control.EndTry
+Program.Sub.LoadDT.End
+
+Program.Sub.LoadOptions.Start
+V.Local.bSuppress.Declare
+V.Local.bInvSupp.Declare
+F.Intrinsic.Control.Try
+
+F.Intrinsic.Control.BlockEvents
+'chkSuppress
+F.Global.Registry.ReadValue(V.Caller.User,V.Caller.CompanyCode,"RAW MATERIAL DASHBOARD",5983,0,0,False,V.Local.bSuppress)
+F.Intrinsic.Control.If(V.Local.bSuppress)
+	Gui.F_Dash.chkSuppress.Value(1)
+F.Intrinsic.Control.EndIf
+'chkInvSupp
+F.Global.Registry.ReadValue(V.Caller.User,V.Caller.CompanyCode,"RAW MATERIAL DASHBOARD",5983,1,0,False,V.Local.bInvSupp)
+F.Intrinsic.Control.If(V.Local.bInvSupp)
+	Gui.F_Dash.chkInvSupp.Value(1)
+F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.UnBlockEvents
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage,"ScriptFile",V.Caller.ScriptFile,"CurrentSubroutine",V.Ambient.CurrentSubroutine)
+	F.Intrinsic.Control.CallSub(F_Dash_UnLoad)
+F.Intrinsic.Control.EndTry
+Program.Sub.LoadOptions.End
+
+Program.Sub.chkSupp_Click.Start
+'Save checked field in GS_REGISTRY and update dataview
+V.Local.sFilter.Declare
+V.Local.sRow.Declare
+F.Intrinsic.Control.Try
+
+'chkSuppress
+F.Global.Registry.AddValue(V.Caller.User,V.Caller.CompanyCode,"RAW MATERIAL DASHBOARD",5983,0,False,"chkSuppress",V.Screen.F_Dash!chkSuppress.CheckedAsBoolean,0,-999.0,1/1/1980,12:00:00 AM,"")
+'chkInvSupp
+F.Global.Registry.AddValue(V.Caller.User,V.Caller.CompanyCode,"RAW MATERIAL DASHBOARD",5983,1,False,"chkInvSupp",V.Screen.F_Dash!chkInvSupp.CheckedAsBoolean,0,-999.0,1/1/1980,12:00:00 AM,"")
+
+F.Intrinsic.Control.If(V.Screen.F_Dash!chkSuppress.CheckedAsBoolean)
+	V.Local.sFilter.Set("[SUPPRESS] = False")
+F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.If(V.Screen.F_Dash!chkSuppress.CheckedAsBoolean,=,True,and,V.Screen.F_Dash!chkInvSupp.CheckedAsBoolean,=,True)
+	F.Intrinsic.String.Build("{0} and ",V.Local.sFilter,V.Local.sFilter)
+F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.If(V.Screen.F_Dash!chkInvSupp.CheckedAsBoolean)
+	F.Intrinsic.String.Build("{0}[INV_SUPPRESS] = False",V.Local.sFilter,V.Local.sFilter)
+F.Intrinsic.Control.EndIf
+F.Data.DataView.SetFilter("dtRawMaterial","dvGridView",V.Local.sFilter)
+Gui.F_Dash.gsgcRawMat.BestFitColumns("gvRawMaterial")
+
+Gui.F_Dash.gsgcRawMat.GetSelectedRows("gvRawMaterial",V.Local.sRow)
+F.Intrinsic.Control.If(V.Local.sRow,!=,"")
+	F.Intrinsic.Control.If(V.DataTable.dtRawMaterial(V.Local.sRow.Long).FLAG_LOT!FieldVal,=,"Y")
+		F.Intrinsic.String.Build("[JOB] = '{0}' and [SUFFIX] = '{1}' and [SEQ] = '{2}'",V.DataTable.dtRawMaterial(V.Local.sRow.Long).JOB!FieldVal,V.DataTable.dtRawMaterial(V.Local.sRow.Long).SUFFIX!FieldVal,V.DataTable.dtRawMaterial(V.Local.sRow.Long).SEQ!FieldVal,V.Local.sFilter)
+		F.Data.DataView.SetFilter("dtLotBin","dvPart",V.Local.sFilter)
+		Gui.F_Dash.gsgcLotBin.BestFitColumns("gvItemMaster")
+	F.Intrinsic.Control.Else
+		F.Data.DataView.SetFilter("dtLotBin","dvPart","[JOB] = '' and [SUFFIX] = '' and [SEQ] = ''")
+		Gui.F_Dash.gsgcLotBin.BestFitColumns("gvItemMaster")
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.Else
+	F.Data.DataView.SetFilter("dtLotBin","dvPart","[JOB] = '' and [SUFFIX] = '' and [SEQ] = ''")
+	Gui.F_Dash.gsgcLotBin.BestFitColumns("gvItemMaster")
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage,"ScriptFile",V.Caller.ScriptFile,"CurrentSubroutine",V.Ambient.CurrentSubroutine)
+	F.Intrinsic.Control.CallSub(F_Dash_UnLoad)
+F.Intrinsic.Control.EndTry
+Program.Sub.chkSupp_Click.End
+
+Program.Sub.SetupGridView.Start
+V.Local.iVisibleIndex.Declare
+V.Local.sRow.Declare
+V.Local.sFilter.Declare
+F.Intrinsic.Control.Try
+
+Gui.F_Dash.gsgcRawMat.AddGridviewFromDataView("gvRawMaterial","dtRawMaterial","dvGridView")
+Gui.F_Dash.gsgcLotBin.AddGridviewFromDataView("gvItemMaster","dtLotBin","dvPart")
+
+Gui.F_Dash.gsgcRawMat.SetGridviewProperty("gvRawMaterial","OptionsViewColumnAutoWidth",False)
+'Gui.F_Dash.gsgcRawMat.SetGridviewProperty("gvRawMaterial","MultiSelectMode",1)
+Gui.F_Dash.gsgcRawMat.SetGridviewProperty("gvRawMaterial","MultiSelect",False)
+Gui.F_Dash.gsgcRawMat.SetGridviewProperty("gvRawMaterial","EnterKeyNavigation","Vertical")
+Gui.F_Dash.gsgcLotBin.SetGridviewProperty("gvItemMaster","OptionsViewColumnAutoWidth",False)
+'Gui.F_Dash.gsgcLotBin.SetGridviewProperty("gvItemMaster","MultiSelectMode",1)
+Gui.F_Dash.gsgcLotBin.SetGridviewProperty("gvItemMaster","MultiSelect",False)
+Gui.F_Dash.gsgcLotBin.SetGridviewProperty("gvItemMaster","EnterKeyNavigation","Vertical")
+
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","JOB","Visible",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","JOB","AllowShowHide",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","SUFFIX","Visible",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","SUFFIX","AllowShowHide",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PART","Visible",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PART","AllowShowHide",False)
+F.Intrinsic.Control.If(V.Global.bUseRev.Not)
+	Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PART_REV","Visible",False)
+	Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PART_REV","AllowShowHide",False)
+F.Intrinsic.Control.EndIf
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","FG_PART","Visible",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","FG_PART","AllowShowHide",False)
+F.Intrinsic.Control.If(V.Global.bUseRev.Not)
+	Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","FG_PART_REV","Visible",False)
+	Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","FG_PART_REV","AllowShowHide",False)
+F.Intrinsic.Control.EndIf
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","LOCATION","Visible",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","LOCATION","AllowShowHide",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","FG_LOCATION","Visible",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","FG_LOCATION","AllowShowHide",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","SUPPRESS","Visible",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","SUPPRESS","AllowShowHide",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","INV_SUPPRESS","Visible",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","INV_SUPPRESS","AllowShowHide",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","FLAG_LOT","Visible",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","FLAG_LOT","AllowShowHide",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","LOTBINSATISFIED","Visible",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","LOTBINSATISFIED","AllowShowHide",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","ISSUE_SATISFIED","Visible",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","ISSUE_SATISFIED","AllowShowHide",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","JOB","Visible",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","JOB","AllowShowHide",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","SUFFIX","Visible",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","SUFFIX","AllowShowHide",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","SEQ","Visible",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","SEQ","AllowShowHide",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","PART","Visible",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","PART","AllowShowHide",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","LOCATION","Visible",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","LOCATION","AllowShowHide",False)
+
+V.Local.iVisibleIndex.Set(-1)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","WO","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","SEQ","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PART_NUM","VisibleIndex",V.Local.iVisibleIndex.++)
+F.Intrinsic.Control.If(V.Global.bUseRev)
+	Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PART_REV","VisibleIndex",V.Local.iVisibleIndex.++)
+F.Intrinsic.Control.EndIf
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PL","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PL_NAME","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","DATE_START","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","DATE_DUE","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","DESCRIPTION","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","WORKCENTER","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_ONHAND","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_EST","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_ACT","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_OPEN","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","FG_PART_NUM","VisibleIndex",V.Local.iVisibleIndex.++)
+F.Intrinsic.Control.If(V.Global.bUseRev)
+	Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","FG_PART_REV","VisibleIndex",V.Local.iVisibleIndex.++)
+F.Intrinsic.Control.EndIf
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_TOISSUE","Fixed","Right")
+V.Local.iVisibleIndex.Set(-1)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","LOT","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","BIN","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","HEAT","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","SERIAL","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_1","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_2","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_3","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_4","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_5","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_6","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_7","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_8","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_9","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","QTY_ONHAND","VisibleIndex",V.Local.iVisibleIndex.++)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","QTY_TOISSUE","Fixed","Right")
+
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","WO","Caption","Work Order")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","SEQ","Caption","Seq")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PART_NUM","Caption","Part Num")
+F.Intrinsic.Control.If(V.Global.bUseRev)
+	Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PART_REV","Caption","Rev")
+F.Intrinsic.Control.EndIf
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PL","Caption","PL")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PL_NAME","Caption","Product Line")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","DATE_START","Caption","Start Date")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","DATE_DUE","Caption","Due Date")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","DESCRIPTION","Caption","Description")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","WORKCENTER","Caption","Work Center")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_ONHAND","Caption","On Hand Quantity")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_EST","Caption","Required Quantity")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_ACT","Caption","Issued Quantity")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_OPEN","Caption","Open Quantity")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","FG_PART_NUM","Caption","Assembly Num")
+F.Intrinsic.Control.If(V.Global.bUseRev)
+	Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","FG_PART_REV","Caption","Assembly Rev")
+F.Intrinsic.Control.EndIf
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_TOISSUE","Caption","Quantity To Issue")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","LOT","Caption","Lot")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","BIN","Caption","Bin")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","HEAT","Caption","Heat")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","SERIAL","Caption","Serial")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_1","Caption",V.Global.sUser1)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_2","Caption",V.Global.sUser2)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_3","Caption",V.Global.sUser3)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_4","Caption",V.Global.sUser4)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_5","Caption",V.Global.sUser5)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_6","Caption",V.Global.sUser6)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_7","Caption",V.Global.sUser7)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_8","Caption",V.Global.sUser8)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_9","Caption",V.Global.sUser9)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","QTY_ONHAND","Caption","On Hand Quantity")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","QTY_TOISSUE","Caption","Quantity To Issue")
+
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","WO","AllowEdit",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","SEQ","AllowEdit",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PART_NUM","AllowEdit",False)
+F.Intrinsic.Control.If(V.Global.bUseRev)
+	Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PART_REV","AllowEdit",False)
+F.Intrinsic.Control.EndIf
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PL","AllowEdit",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PL_NAME","AllowEdit",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","DATE_START","AllowEdit",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","DATE_DUE","AllowEdit",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","DESCRIPTION","AllowEdit",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","WORKCENTER","AllowEdit",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_ONHAND","AllowEdit",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_EST","AllowEdit",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_ACT","AllowEdit",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_OPEN","AllowEdit",False)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","FG_PART_NUM","AllowEdit",False)
+F.Intrinsic.Control.If(V.Global.bUseRev)
+	Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","FG_PART_REV","AllowEdit",False)
+F.Intrinsic.Control.EndIf
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_TOISSUE","ReadOnly",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","LOT","AllowEdit",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","BIN","AllowEdit",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","HEAT","AllowEdit",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","SERIAL","AllowEdit",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_1","AllowEdit",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_2","AllowEdit",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_3","AllowEdit",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_4","AllowEdit",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_5","AllowEdit",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_6","AllowEdit",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_7","AllowEdit",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_8","AllowEdit",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_9","AllowEdit",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","QTY_ONHAND","AllowEdit",False)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","QTY_TOISSUE","ReadOnly",False)
+
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","WO","HeaderHAlignment","Center")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","SEQ","HeaderHAlignment","Center")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PART_NUM","HeaderHAlignment","Center")
+F.Intrinsic.Control.If(V.Global.bUseRev)
+	Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PART_REV","HeaderHAlignment","Center")
+F.Intrinsic.Control.EndIf
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PL","HeaderHAlignment","Center")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PL_NAME","HeaderHAlignment","Near")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","DATE_START","HeaderHAlignment","Center")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","DATE_DUE","HeaderHAlignment","Center")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","DESCRIPTION","HeaderHAlignment","Near")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","WORKCENTER","HeaderHAlignment","Center")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_ONHAND","HeaderHAlignment","Far")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_EST","HeaderHAlignment","Far")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_ACT","HeaderHAlignment","Far")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_OPEN","HeaderHAlignment","Far")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","FG_PART_NUM","HeaderHAlignment","Center")
+F.Intrinsic.Control.If(V.Global.bUseRev)
+	Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","FG_PART_REV","HeaderHAlignment","Center")
+F.Intrinsic.Control.EndIf
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_TOISSUE","HeaderHAlignment","Far")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","LOT","HeaderHAlignment","Center")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","BIN","HeaderHAlignment","Center")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","HEAT","HeaderHAlignment","Center")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","SERIAL","HeaderHAlignment","Center")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_1","HeaderHAlignment","Near")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_2","HeaderHAlignment","Near")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_3","HeaderHAlignment","Near")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_4","HeaderHAlignment","Near")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_5","HeaderHAlignment","Near")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_6","HeaderHAlignment","Near")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_7","HeaderHAlignment","Near")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_8","HeaderHAlignment","Near")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_9","HeaderHAlignment","Near")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","QTY_ONHAND","HeaderHAlignment","Far")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","QTY_TOISSUE","HeaderHAlignment","Far")
+
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","WO","HeaderFontBold",True)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","SEQ","HeaderFontBold",True)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PART_NUM","HeaderFontBold",True)
+F.Intrinsic.Control.If(V.Global.bUseRev)
+	Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PART_REV","HeaderFontBold",True)
+F.Intrinsic.Control.EndIf
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PL","HeaderFontBold",True)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PL_NAME","HeaderFontBold",True)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","DATE_START","HeaderFontBold",True)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","DATE_DUE","HeaderFontBold",True)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","DESCRIPTION","HeaderFontBold",True)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","WORKCENTER","HeaderFontBold",True)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_ONHAND","HeaderFontBold",True)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_EST","HeaderFontBold",True)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_ACT","HeaderFontBold",True)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_OPEN","HeaderFontBold",True)
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","FG_PART_NUM","HeaderFontBold",True)
+F.Intrinsic.Control.If(V.Global.bUseRev)
+	Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","FG_PART_REV","HeaderFontBold",True)
+F.Intrinsic.Control.EndIf
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_TOISSUE","HeaderFontBold",True)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","LOT","HeaderFontBold",True)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","BIN","HeaderFontBold",True)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","HEAT","HeaderFontBold",True)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","SERIAL","HeaderFontBold",True)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_1","HeaderFontBold",True)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_2","HeaderFontBold",True)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_3","HeaderFontBold",True)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_4","HeaderFontBold",True)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_5","HeaderFontBold",True)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_6","HeaderFontBold",True)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_7","HeaderFontBold",True)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_8","HeaderFontBold",True)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_9","HeaderFontBold",True)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","QTY_ONHAND","HeaderFontBold",True)
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","QTY_TOISSUE","HeaderFontBold",True)
+
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","WO","CellHAlignment","Center")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","SEQ","CellHAlignment","Center")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PART_NUM","CellHAlignment","Center")
+F.Intrinsic.Control.If(V.Global.bUseRev)
+	Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PART_REV","CellHAlignment","Center")
+F.Intrinsic.Control.EndIf
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PL","CellHAlignment","Center")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PL_NAME","CellHAlignment","Near")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","DATE_START","CellHAlignment","Center")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","DATE_DUE","CellHAlignment","Center")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","DESCRIPTION","CellHAlignment","Near")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","WORKCENTER","CellHAlignment","Center")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_ONHAND","CellHAlignment","Far")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_EST","CellHAlignment","Far")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_ACT","CellHAlignment","Far")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_OPEN","CellHAlignment","Far")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","FG_PART_NUM","CellHAlignment","Center")
+F.Intrinsic.Control.If(V.Global.bUseRev)
+	Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","FG_PART_REV","CellHAlignment","Center")
+F.Intrinsic.Control.EndIf
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_TOISSUE","CellHAlignment","Far")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","LOT","CellHAlignment","Center")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","BIN","CellHAlignment","Center")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","HEAT","CellHAlignment","Center")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","SERIAL","CellHAlignment","Center")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_1","CellHAlignment","Near")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_2","CellHAlignment","Near")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_3","CellHAlignment","Near")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_4","CellHAlignment","Near")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_5","CellHAlignment","Near")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_6","CellHAlignment","Near")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_7","CellHAlignment","Near")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_8","CellHAlignment","Near")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","USER_9","CellHAlignment","Near")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","QTY_ONHAND","CellHAlignment","Far")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","QTY_TOISSUE","CellHAlignment","Far")
+
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","DATE_START","DisplayCustomDateTime","d")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","DATE_DUE","DisplayCustomDateTime","d")
+
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_EST","DisplayCustomNumeric","0.0000")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_ONHAND","DisplayCustomNumeric","0.0000")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_OPEN","DisplayCustomNumeric","0.0000")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_TOISSUE","DisplayCustomNumeric","0.0000")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","QTY_ONHAND","DisplayCustomNumeric","0.0000")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","QTY_TOISSUE","DisplayCustomNumeric","0.0000")
+
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","WO","CellForeColor","Blue")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","PART_NUM","CellForeColor","Blue")
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","FG_PART_NUM","CellForeColor","Blue")
+
+Gui.F_Dash.gsgcRawMat.SetColumnProperty("gvRawMaterial","QTY_TOISSUE","CellBackColor","LightYellow")
+Gui.F_Dash.gsgcLotBin.SetColumnProperty("gvItemMaster","QTY_TOISSUE","CellBackColor","LightYellow")
+
+Gui.F_Dash.gsgcRawMat.AddStyleFormatCondition("gvRawMaterial","ISSUE_SATISFIED","IssueNotSatisfied","Expression","[ISSUE_SATISFIED] = False and [QTY_TOISSUE] > 0")
+Gui.F_Dash.gsgcRawMat.AddStyleFormatCondition("gvRawMaterial","ISSUE_SATISFIED","IssueSatisfied","Expression","[ISSUE_SATISFIED] = True and [QTY_TOISSUE] > 0")
+Gui.F_Dash.gsgcRawMat.SetStyleFormatConditionProperty("gvRawMaterial","ISSUE_SATISFIED","IssueNotSatisfied","BackColor","Pink")
+Gui.F_Dash.gsgcRawMat.SetStyleFormatConditionProperty("gvRawMaterial","ISSUE_SATISFIED","IssueNotSatisfied","ApplyToRow",True)
+Gui.F_Dash.gsgcRawMat.SetStyleFormatConditionProperty("gvRawMaterial","ISSUE_SATISFIED","IssueSatisfied","BackColor","LightGreen")
+Gui.F_Dash.gsgcRawMat.SetStyleFormatConditionProperty("gvRawMaterial","ISSUE_SATISFIED","IssueSatisfied","ApplyToRow",True)
+
+Gui.F_Dash.gsgcRawMat.MainView("gvRawMaterial")
+Gui.F_Dash.gsgcLotBin.MainView("gvItemMaster")
+
+F.Intrinsic.Control.CallSub(Deserialize)
+
+Gui.F_Dash.gsgcRawMat.GetSelectedRows("gvRawMaterial",V.Local.sRow)
+F.Intrinsic.Control.If(V.Local.sRow,!=,"")
+	F.Intrinsic.Control.If(V.DataTable.dtRawMaterial(V.Local.sRow.Long).FLAG_LOT!FieldVal,=,"Y")
+		F.Intrinsic.String.Build("[JOB] = '{0}' and [SUFFIX] = '{1}' and [SEQ] = '{2}'",V.DataTable.dtRawMaterial(V.Local.sRow.Long).JOB!FieldVal,V.DataTable.dtRawMaterial(V.Local.sRow.Long).SUFFIX!FieldVal,V.DataTable.dtRawMaterial(V.Local.sRow.Long).SEQ!FieldVal,V.Local.sFilter)
+		F.Data.DataView.SetFilter("dtLotBin","dvPart",V.Local.sFilter)
+		Gui.F_Dash.gsgcLotBin.BestFitColumns("gvItemMaster")
+	F.Intrinsic.Control.Else
+		F.Data.DataView.SetFilter("dtLotBin","dvPart","[JOB] = '' and [SUFFIX] = '' and [SEQ] = ''")
+		Gui.F_Dash.gsgcLotBin.BestFitColumns("gvItemMaster")
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.Else
+	F.Data.DataView.SetFilter("dtLotBin","dvPart","[JOB] = '' and [SUFFIX] = '' and [SEQ] = ''")
+	Gui.F_Dash.gsgcLotBin.BestFitColumns("gvItemMaster")
+F.Intrinsic.Control.EndIf
+
+Gui.F_Dash.gsgcRawMat.BestFitColumns("gvRawMaterial")
+Gui.F_Dash.gsgcLotBin.BestFitColumns("gvItemMaster")
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage,"ScriptFile",V.Caller.ScriptFile,"CurrentSubroutine",V.Ambient.CurrentSubroutine)
+	F.Intrinsic.Control.CallSub(F_Dash_UnLoad)
+F.Intrinsic.Control.EndTry
+Program.Sub.SetupGridView.End
+
+Program.Sub.gsgcRawMat_RowCellClick.Start
+V.Local.sFilter.Declare
+F.Intrinsic.Control.Try
+
+F.Intrinsic.Control.If(V.Args.Button.UCase,=,"RIGHT")
+	F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.If(V.DataTable.dtRawMaterial(V.Args.RowIndex).FLAG_LOT!FieldVal,=,"Y")
+	'Set LotBin gridview for current Part/Loc
+	F.Intrinsic.String.Build("[JOB] = '{0}' and [SUFFIX] = '{1}' and [SEQ] = '{2}'",V.DataTable.dtRawMaterial(V.Args.RowIndex).JOB!FieldVal,V.DataTable.dtRawMaterial(V.Args.RowIndex).SUFFIX!FieldVal,V.DataTable.dtRawMaterial(V.Args.RowIndex).SEQ!FieldVal,V.Local.sFilter)
+	F.Data.DataView.SetFilter("dtLotBin","dvPart",V.Local.sFilter)
+	Gui.F_Dash.gsgcLotBin.BestFitColumns("gvItemMaster")
+F.Intrinsic.Control.Else
+	F.Data.DataView.SetFilter("dtLotBin","dvPart","[JOB] = '' and [SUFFIX] = '' and [SEQ] = ''")
+	Gui.F_Dash.gsgcLotBin.BestFitColumns("gvItemMaster")
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.SelectCase(V.Args.Column.UCase)
+	F.Intrinsic.Control.Case("WO")
+		'Open View WO Screen
+		F.Data.DataTable.AddRow("450000","Mode",7,"WONum",V.DataTable.dtRawMaterial(V.Args.RowIndex).JOB!FieldVal,"WOSuffix",V.DataTable.dtRawMaterial(V.Args.RowIndex).SUFFIX!FieldVal,"ActOrHist","A")
+		Gui.F_Dash..Enabled(False)
+		F.Intrinsic.Control.CallSub(450000Sync)
+		Gui.F_Dash..Enabled(True)
+		Gui.F_Dash..SetFocus
+	F.Intrinsic.Control.Case("PART_NUM")
+		'Open Supply and Demand
+		F.Data.DataTable.AddRow("300011","Part",V.DataTable.dtRawMaterial(V.Args.RowIndex).PART!FieldVal,"Location",V.DataTable.dtRawMaterial(V.Args.RowIndex).LOCATION!FieldVal,"Switch","")
+		Gui.F_Dash..Enabled(False)
+		F.Intrinsic.Control.CallSub(300011Sync)
+		Gui.F_Dash..Enabled(True)
+		Gui.F_Dash..SetFocus
+	F.Intrinsic.Control.Case("FG_PART_NUM")
+		'Open Supply and Demand
+		F.Data.DataTable.AddRow("300011","Part",V.DataTable.dtRawMaterial(V.Args.RowIndex).FG_PART!FieldVal,"Location",V.DataTable.dtRawMaterial(V.Args.RowIndex).FG_LOCATION!FieldVal,"Switch","")
+		Gui.F_Dash..Enabled(False)
+		F.Intrinsic.Control.CallSub(300011Sync)
+		Gui.F_Dash..Enabled(True)
+		Gui.F_Dash..SetFocus
+F.Intrinsic.Control.EndSelect
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage,"ScriptFile",V.Caller.ScriptFile,"CurrentSubroutine",V.Ambient.CurrentSubroutine)
+	F.Intrinsic.Control.CallSub(F_Dash_UnLoad)
+F.Intrinsic.Control.EndTry
+Program.Sub.gsgcRawMat_RowCellClick.End
+
+Program.Sub.gsgcRawMat_CellValueChanged.Start
+V.Local.sFilter.Declare
+V.Local.iRet.Declare
+V.Local.fItemMasterQty.Declare
+F.Intrinsic.Control.Try
+
+F.Intrinsic.Control.If(V.DataTable.dtRawMaterial(V.Args.RowIndex).FLAG_LOT!FieldVal,=,"Y")
+	'Set LotBin gridview for current Part/Loc
+	F.Intrinsic.String.Build("[JOB] = '{0}' and [SUFFIX] = '{1}' and [SEQ] = '{2}'",V.DataTable.dtRawMaterial(V.Args.RowIndex).JOB!FieldVal,V.DataTable.dtRawMaterial(V.Args.RowIndex).SUFFIX!FieldVal,V.DataTable.dtRawMaterial(V.Args.RowIndex).SEQ!FieldVal,V.Local.sFilter)
+	F.Data.DataView.SetFilter("dtLotBin","dvPart",V.Local.sFilter)
+	Gui.F_Dash.gsgcLotBin.BestFitColumns("gvItemMaster")
+	F.Data.DataTable.Compute("dtLotBin","SUM(QTY_TOISSUE)",V.Local.sFilter,V.Local.fItemMasterQty)
+	F.Intrinsic.Control.If(V.Global.bAutoIssue,=,True,and,V.DataView.dtLotBin!dvPart.RowCount,=,1)
+		'Auto Issue for one LotBin record is turned on, so set the quantity of what was entered to the lotbin record
+		F.Data.DataView.SetValue("dtLotBin","dvPart",-1,"QTY_TOISSUE",V.Args.Value)
+		F.Data.DataTable.SetValue("dtRawMaterial",V.Args.RowIndex,"LOTBINSATISFIED",True)
+	F.Intrinsic.Control.ElseIf(V.Local.fItemMasterQty,>,V.Args.Value)
+		F.Intrinsic.UI.Msgbox("There are quantities already entered on the Lot/Bin View, would you like to continue?","ALL CHANGES WILL BE LOST",4,V.Local.iRet)
+		F.Intrinsic.Control.If(V.Local.iRet,=,V.Ambient.MsgBoxYes)
+			F.Data.DataView.SetValue("dtLotBin","dvPart",-1,"QTY_TOISSUE",0)
+			F.Data.DataTable.SetValue("dtRawMaterial",V.Args.RowIndex,"LOTBINSATISFIED",False)
+		F.Intrinsic.Control.Else
+			F.Data.DataTable.SetValue("dtRawMaterial",V.Args.RowIndex,"QTY_TOISSUE",V.Local.fItemMasterQty,"LOTBINSATISFIED",True)
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.ElseIf(V.Local.fItemMasterQty,=,V.Args.Value)
+		F.Data.DataTable.SetValue("dtRawMaterial",V.Args.RowIndex,"LOTBINSATISFIED",True)
+	F.Intrinsic.Control.Else
+		F.Data.DataTable.SetValue("dtRawMaterial",V.Args.RowIndex,"LOTBINSATISFIED",False)
+	F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.Else
+	F.Data.DataView.SetFilter("dtLotBin","dvPart","[JOB] = '' and [SUFFIX] = '' and [SEQ] = ''")
+	Gui.F_Dash.gsgcLotBin.BestFitColumns("gvItemMaster")
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage,"ScriptFile",V.Caller.ScriptFile,"CurrentSubroutine",V.Ambient.CurrentSubroutine)
+	F.Intrinsic.Control.CallSub(F_Dash_UnLoad)
+F.Intrinsic.Control.EndTry
+Program.Sub.gsgcRawMat_CellValueChanged.End
+
+Program.Sub.gsgcLotBin_CellValueChanged.Start
+V.Local.sFilter.Declare
+V.Local.sRow.Declare
+V.Local.fItemMasterQty.Declare
+F.Intrinsic.Control.Try
+
+F.Intrinsic.Control.If(V.DataTable.dtLotBin(V.Args.RowIndex).QTY_TOISSUE!FieldVal,>,V.DataTable.dtLotBin(V.Args.RowIndex).QTY_ONHAND!FieldVal)
+	F.Data.DataTable.SetValue("dtLotBin",V.Args.RowIndex,"QTY_TOISSUE",V.DataTable.dtLotBin(V.Args.RowIndex).QTY_ONHAND!FieldVal)
+F.Intrinsic.Control.EndIf
+
+'Check LotBin against QtyToIssue from main table
+F.Intrinsic.String.Build("[PART] = '{0}' and [LOCATION] = '{1}'",V.DataTable.dtLotBin(V.Args.RowIndex).PART!FieldVal,V.DataTable.dtLotBin(V.Args.RowIndex).LOCATION!FieldVal,V.Local.sFilter)
+F.Data.DataTable.Compute("dtLotBin","SUM(QTY_TOISSUE)",V.Local.sFilter,V.Local.fItemMasterQty)
+Gui.F_Dash.gsgcRawMat.GetSelectedRows("gvRawMaterial",V.Local.sRow)
+F.Intrinsic.Control.If(V.DataTable.dtRawMaterial(V.Local.sRow.Long).QTY_TOISSUE!FieldVal,<,V.Local.fItemMasterQty)
+	'Reduce qty to issue on current Item Master record so that the total matches the total qty to issue from main table
+	F.Intrinsic.Math.Sub(V.Local.fItemMasterQty,V.DataTable.dtRawMaterial(V.Local.sRow.Long).QTY_TOISSUE!FieldVal,V.Local.fItemMasterQty)
+	F.Intrinsic.Math.Sub(V.DataTable.dtLotBin(V.Args.RowIndex).QTY_TOISSUE!FieldVal,V.Local.fItemMasterQty,V.Local.fItemMasterQty)
+	F.Data.DataTable.SetValue("dtLotBin",V.Args.RowIndex,"QTY_TOISSUE",V.Local.fItemMasterQty)
+	F.Data.DataTable.SetValue("dtRawMaterial",V.Local.sRow.Long,"LOTBINSATISFIED",True)
+F.Intrinsic.Control.ElseIf(V.DataTable.dtRawMaterial(V.Local.sRow.Long).QTY_TOISSUE!FieldVal,=,V.Local.fItemMasterQty)
+	F.Data.DataTable.SetValue("dtRawMaterial",V.Local.sRow.Long,"LOTBINSATISFIED",True)
+F.Intrinsic.Control.Else
+	F.Data.DataTable.SetValue("dtRawMaterial",V.Local.sRow.Long,"LOTBINSATISFIED",False)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage,"ScriptFile",V.Caller.ScriptFile,"CurrentSubroutine",V.Ambient.CurrentSubroutine)
+	F.Intrinsic.Control.CallSub(F_Dash_UnLoad)
+F.Intrinsic.Control.EndTry
+Program.Sub.gsgcLotBin_CellValueChanged.End
+
+Program.Sub.Deserialize.Start
+V.Local.Serialize.Declare
+'GridView - gvRawMaterial
+F.Global.Registry.ReadValue(V.Caller.User,V.Caller.CompanyCode,"RAW MATERIAL DASHBOARD",5983,2,6,"",V.Local.Serialize)
+F.Intrinsic.Control.If(V.Local.Serialize.Trim,<>,"")
+	Gui.F_Dash.gsgcRawMat.Deserialize(V.Local.Serialize)
+F.Intrinsic.Control.EndIf
+'GridView - gvItemMaster
+F.Global.Registry.ReadValue(V.Caller.User,V.Caller.CompanyCode,"RAW MATERIAL DASHBOARD",5983,3,6,"",V.Local.Serialize)
+F.Intrinsic.Control.If(V.Local.Serialize.Trim,<>,"")
+	Gui.F_Dash.gsgcLotBin.Deserialize(V.Local.Serialize)
+F.Intrinsic.Control.EndIf
+Program.Sub.Deserialize.End
+
+Program.Sub.Serialize.Start
+V.Local.Serialize.Declare
+'GridView - gvRawMaterial
+Gui.F_Dash.gsgcRawMat.Serialize("gvRawMaterial",V.Local.Serialize)
+F.Global.Registry.AddValue(V.Caller.User,V.Caller.CompanyCode,"RAW MATERIAL DASHBOARD",5983,2,False,"Serialize gvRawMaterial",False,0,-999.0,1/1/1980,12:00:00 AM,V.Local.Serialize)
+'GridView - gvItemMaster
+Gui.F_Dash.gsgcLotBin.Serialize("gvItemMaster",V.Local.Serialize)
+F.Global.Registry.AddValue(V.Caller.User,V.Caller.CompanyCode,"RAW MATERIAL DASHBOARD",5983,3,False,"Serialize gvItemMaster",False,0,-999.0,1/1/1980,12:00:00 AM,V.Local.Serialize)
+Program.Sub.Serialize.End
+
+Program.Sub.cmdProcess_Click.Start
+V.Local.sMsg.Declare
+V.Local.sFilter.Declare
+V.Local.sQty.Declare
+V.Local.iRet.Declare
+V.Local.iSeq.Declare
+V.Local.iLotBin.Declare
+F.Intrinsic.Control.Try
+
+F.Data.DataView.Create("dtRawMaterial","dvProcess")
+F.Data.DataView.SetFilter("dtRawMaterial","dvProcess","[ISSUE_SATISFIED] = True and [QTY_TOISSUE] > 0")
+
+F.Intrinsic.Control.If(V.DataView.dtRawMaterial!dvProcess.RowCount,=,0)
+	F.Data.DataView.Close("dtRawMaterial","dvProcess")
+	F.Intrinsic.Control.ExitSub
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.String.Build("Processing {0} issue material transactions. Would you like to continue?",V.DataView.dtRawMaterial!dvProcess.RowCount,V.Local.sMsg)
+F.Intrinsic.UI.Msgbox(V.Local.sMsg,"CONFIRM PROCESS",4,V.Local.iRet)
+
+F.Intrinsic.Control.If(V.Local.iRet,=,V.Ambient.MsgBoxYes)
+	Gui.F_Dash..Visible(False)
+	F.Intrinsic.UI.InvokeWaitDialog("Building Issue Material File...","Raw Material Allocation Dashboard")
+	F.Data.DataView.Create("dtLotBin","dvProcess")
+	F.Intrinsic.Control.For(V.Local.iSeq,0,V.DataView.dtRawMaterial!dvProcess.RowCount--,1)
+		F.Intrinsic.Control.If(V.DataView.dtRawMaterial!dvProcess(V.Local.iSeq).FLAG_LOT!FieldVal,=,"Y")
+			F.Intrinsic.String.Build("[JOB] = '{0}' and [SUFFIX] = '{1}' and [SEQ] = '{2}' and [QTY_TOISSUE] > 0",V.DataView.dtRawMaterial!dvProcess(V.Local.iSeq).JOB!FieldVal,V.DataView.dtRawMaterial!dvProcess(V.Local.iSeq).SUFFIX!FieldVal,V.DataView.dtRawMaterial!dvProcess(V.Local.iSeq).SEQ!FieldVal,V.Local.sFilter)
+			F.Data.DataView.SetFilter("dtLotBin","dvProcess",V.Local.sFilter)
+			F.Intrinsic.Control.For(V.Local.iLotBin,0,V.DataView.dtLotBin!dvProcess.RowCount--,1)
+				F.Intrinsic.String.Split(V.DataView.dtLotBin!dvProcess(V.Local.iLotBin).QTY_TOISSUE!FieldValString,".",V.Local.sQty)
+				F.Intrinsic.Control.If(V.Local.sQty.UBound,=,1)
+					F.Intrinsic.String.Join(V.Local.sQty,".",V.Local.sQty)
+					V.Local.sQty.RedimPreserve(0,0)
+				F.Intrinsic.Control.Else
+					F.Intrinsic.String.Build("{0}.0",V.Local.sQty,V.Local.sQty)
+				F.Intrinsic.Control.EndIf
+				F.Intrinsic.Control.If(V.Global.bUseRev)
+					F.Data.DataTable.AddRow("450100","Part",V.DataView.dtRawMaterial!dvProcess(V.Local.iSeq).PART_NUM!FieldVal,"Rev",V.DataView.dtRawMaterial!dvProcess(V.Local.iSeq).PART_REV!FieldVal,"Location",V.DataView.dtLotBin!dvProcess(V.Local.iLotBin).LOCATION!FieldVal,"Quantity",V.Local.sQty,"Lot",V.DataView.dtLotBin!dvProcess(V.Local.iLotBin).LOT!FieldVal,"Bin",V.DataView.dtLotBin!dvProcess(V.Local.iLotBin).BIN!FieldVal,"Heat",V.DataView.dtLotBin!dvProcess(V.Local.iLotBin).HEAT!FieldVal,"Serial",V.DataView.dtLotBin!dvProcess(V.Local.iLotBin).SERIAL!FieldVal,"WONumber",V.DataView.dtLotBin!dvProcess(V.Local.iLotBin).JOB!FieldVal,"WOSuffix",V.DataView.dtLotBin!dvProcess(V.Local.iLotBin).SUFFIX!FieldVal,"WOSeq",V.DataView.dtLotBin!dvProcess(V.Local.iLotBin).SEQ!FieldVal)
+				F.Intrinsic.Control.Else
+					F.Data.DataTable.AddRow("450100","Part",V.DataView.dtLotBin!dvProcess(V.Local.iLotBin).PART!FieldVal,"Location",V.DataView.dtLotBin!dvProcess(V.Local.iLotBin).LOCATION!FieldVal,"Quantity",V.Local.sQty,"Lot",V.DataView.dtLotBin!dvProcess(V.Local.iLotBin).LOT!FieldVal,"Bin",V.DataView.dtLotBin!dvProcess(V.Local.iLotBin).BIN!FieldVal,"Heat",V.DataView.dtLotBin!dvProcess(V.Local.iLotBin).HEAT!FieldVal,"Serial",V.DataView.dtLotBin!dvProcess(V.Local.iLotBin).SERIAL!FieldVal,"WONumber",V.DataView.dtLotBin!dvProcess(V.Local.iLotBin).JOB!FieldVal,"WOSuffix",V.DataView.dtLotBin!dvProcess(V.Local.iLotBin).SUFFIX!FieldVal,"WOSeq",V.DataView.dtLotBin!dvProcess(V.Local.iLotBin).SEQ!FieldVal)
+				F.Intrinsic.Control.EndIf
+			F.Intrinsic.Control.Next(V.Local.iLotBin)
+		F.Intrinsic.Control.Else
+			F.Intrinsic.String.Split(V.DataView.dtRawMaterial!dvProcess(V.Local.iSeq).QTY_TOISSUE!FieldVal,".",V.Local.sQty)
+			F.Intrinsic.Control.If(V.Local.sQty.UBound,=,1)
+				F.Intrinsic.String.Join(V.Local.sQty,".",V.Local.sQty)
+				V.Local.sQty.RedimPreserve(0,0)
+			F.Intrinsic.Control.Else
+				F.Intrinsic.String.Build("{0}.0",V.Local.sQty,V.Local.sQty)
+			F.Intrinsic.Control.EndIf
+			F.Intrinsic.Control.If(V.Global.bUseRev)
+				F.Data.DataTable.AddRow("450100","Part",V.DataView.dtRawMaterial!dvProcess(V.Local.iSeq).PART_NUM!FieldVal,"Rev",V.DataView.dtRawMaterial!dvProcess(V.Local.iSeq).PART_REV!FieldVal,"Location",V.DataView.dtRawMaterial!dvProcess(V.Local.iSeq).LOCATION!FieldVal,"Quantity",V.Local.sQty,"WONumber",V.DataView.dtRawMaterial!dvProcess(V.Local.iSeq).JOB!FieldVal,"WOSuffix",V.DataView.dtRawMaterial!dvProcess(V.Local.iSeq).SUFFIX!FieldVal,"WOSeq",V.DataView.dtRawMaterial!dvProcess(V.Local.iSeq).SEQ!FieldVal)
+			F.Intrinsic.Control.Else
+				F.Data.DataTable.AddRow("450100","Part",V.DataView.dtRawMaterial!dvProcess(V.Local.iSeq).PART!FieldVal,"Location",V.DataView.dtRawMaterial!dvProcess(V.Local.iSeq).LOCATION!FieldVal,"Quantity",V.Local.sQty,"WONumber",V.DataView.dtRawMaterial!dvProcess(V.Local.iSeq).JOB!FieldVal,"WOSuffix",V.DataView.dtRawMaterial!dvProcess(V.Local.iSeq).SUFFIX!FieldVal,"WOSeq",V.DataView.dtRawMaterial!dvProcess(V.Local.iSeq).SEQ!FieldVal)
+			F.Intrinsic.Control.EndIf
+		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.Next(V.Local.iSeq)
+	F.Intrinsic.UI.ChangeWaitStatus("Issuing Material...")
+	F.Intrinsic.Control.CallSub(450100Sync)
+	
+	F.Intrinsic.Control.CallSub(Serialize)
+	F.Data.DataTable.Close("dtRawMaterial")
+	F.Data.DataTable.Close("dtLotBin")
+	
+	F.Intrinsic.UI.ChangeWaitStatus("Loading Data...")
+	F.Intrinsic.Control.CallSub(LoadDT)
+	F.Intrinsic.UI.ChangeWaitStatus("Setting up Dashboard...")
+	F.Intrinsic.Control.CallSub(SetupGridView)
+	F.Intrinsic.UI.CloseWaitDialog
+	
+	Gui.F_Dash..Visible(True)
+F.Intrinsic.Control.Else
+	F.Data.DataView.Close("dtRawMaterial","dvProcess")
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.Control.CallSub(ErrorMessage,"ScriptFile",V.Caller.ScriptFile,"CurrentSubroutine",V.Ambient.CurrentSubroutine)
+	F.Intrinsic.Control.CallSub(F_Dash_UnLoad)
+F.Intrinsic.Control.EndTry
+Program.Sub.cmdProcess_Click.End
